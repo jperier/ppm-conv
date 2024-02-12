@@ -1,0 +1,18 @@
+socket_server:
+  host: 127.0.0.1
+  port: 8080
+  to: asr
+
+asr:
+  model_size: tiny
+  no_speech_max_prob: 0.7
+  get_speech_segments: true
+  decoding_options:
+    language: fr
+    fp16: false
+    sample_len: 20
+    temperature: 0.0
+    prompt: ~
+  context_type: ~
+  context_options: ~
+  to: socket_server

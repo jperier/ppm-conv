@@ -1,0 +1,25 @@
+global:
+  command_mode: 'transcribe'
+  sample_rate: 16000
+
+device_stream:
+  segment_length: 16000
+  to: [recording, vad]
+
+recording:
+  buffer_size: 60
+
+
+vad:
+  to: socket_client
+
+socket_client:
+  host: 127.0.0.1
+  port: 8080
+  to: [print, transcript_to_file]
+
+print:
+  only_field: text
+
+transcript_to_file:
+  save_details: false

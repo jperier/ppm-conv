@@ -1,0 +1,24 @@
+file_stream:
+  path: test-data
+  pause_time: 1.0
+  to: asr
+
+asr:
+  model_size: large-v2
+  no_speech_max_prob: 0.9
+  decoding_options:
+    language: fr
+    fp16: true
+    sample_len: 20
+    prompt: ~
+  context_type: ~     # prefix, buffer
+  context_options: ~
+#    buffer_size: 5
+#    prefix_size_ratio: 0.1
+#    prefix_text: true
+  to: [print, transcript_to_file]
+
+print:
+  only_field: text
+
+transcript_to_file: ~

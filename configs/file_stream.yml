@@ -1,0 +1,23 @@
+global:
+  command_mode: 'transcribe'
+  sample_rate: 16000
+
+file_stream:
+  path: "test-data/"      # File or dir to stream from
+  pause_time: 0.4         # Time to wait between chunks
+  segment_length: 16000   # Length of each chunk
+  use_file_time: true     # Use file time codes or real time
+  to: vad
+
+vad:
+  threshold: 0.3
+  to: socket_client
+
+socket_client:
+  to: [print, transcript_to_file]
+
+print:
+  only_field: text
+
+transcript_to_file:
+  save_details: true

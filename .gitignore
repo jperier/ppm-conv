@@ -1,0 +1,14 @@
+logs/
+recording/
+transcript/
+ppm/__pycache__/
+ppm/io/__pycache__/
+ppm/ai/__pycache__/
+ppm/network/__pycache__/
+docs/todo/
+configs/test
+configs/faq
+configs/sys_prompts/
+
+.venv/
+.idea/
