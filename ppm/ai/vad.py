@@ -33,7 +33,7 @@ class VADWorker(WorkerProcess):
 
     def setup(self) -> None:
         # Load model
-        self.model, _ = torch.hub.load(repo_or_dir=self.repo_str, model=self.model_str)
+        self.model, _ = torch.hub.load(repo_or_dir=self.repo_str, model=self.model_str, verbose=False)
         self.logger.info(f'VAD model {self.repo_str}/{self.model_str} loaded.')
         self.last_audio_vad = False
         self.silence_count = 0
