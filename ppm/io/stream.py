@@ -1,7 +1,10 @@
+import queue
 import time
 import os
 import torch
 import torchaudio
+import sounddevice as sd
+import numpy as np
 from torchaudio import transforms
 from datetime import datetime
 from typing import Union
@@ -47,6 +50,76 @@ class DeviceStreamWorker(WorkerProcess):
         # Output
         timestamp = datetime.now().isoformat()
         self.output({'command': self.command, 'timestamp': timestamp, 'audio': chunk})
+
+
+@WorkerProcess.register('audio_io')
+class AudioIOWorker(WorkerProcess):
+    def __init__(
+            self,
+            device: str = "hw:0,0",
+            segment_length: int = 16000,
+            sample_rate: int = 16000,
+            command_mode: str = 'conv',
+            **kwargs
+    ):
+        super().__init__(name='audio_io')
+        self.device = device
+        self.segment_length = segment_length
+        self.sample_rate = sample_rate
+        self.command = command_mode
+
+        self.stream: sd.Stream | None = None
+
+    def _callback(self, indata: np.ndarray, outdata: np.ndarray, frames: int, time, status) -> None:
+        """
+        Callback function called by the sounddevice.Stream.
+        """
+        if status:
+            self.logger.warning((str(status)))
+
+        # Device input to worker output
+        timestamp = datetime.now().isoformat()
+        self.output({
+            'command': self.command,
+            'timestamp': timestamp,
+            'audio': torch.tensor(np.squeeze(indata), requires_grad=False)
+        })
+
+        # Worker input to device output
+        outdata.fill(0.)
+        try:
+            data = self.get_input()
+            if data.get('command') == 'conv':
+                audio = data.get('audio')
+                if type(audio) not in (np.ndarray, torch.Tensor):
+                    self.logger.warning(f'Bad audio received: {data}')
+                else:
+                    audio = np.expand_dims(audio, axis=1)
+                    if audio.shape[0] < outdata.shape[0]:
+                        outdata[:audio.shape[0], :audio.shape[1]] = audio
+                    else:
+                        outdata[:] = audio
+        except queue.Empty:
+            pass
+
+    def setup(self) -> None:
+        self.stream = sd.Stream(
+            samplerate=self.sample_rate,
+            blocksize=self.segment_length,
+            device=self.device,
+            channels=1,
+            callback=self._callback,
+            #finished_callback: Any = None
+        )
+
+    def routine(self) -> None:
+        if not self.stream.active:
+            self.stream.start()
+            self.logger.info('Device stream started.')
+        time.sleep(0.5)
+
+    def cleanup(self) -> None:
+        self.stream.abort()
 
 
 @WorkerProcess.register('file_stream')
