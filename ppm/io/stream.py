@@ -118,13 +118,11 @@ class AudioIOWorker(WorkerProcess):
             # Get from buffer
             self.worker_output_buffer.append(
                 np.squeeze(self.device_input_buffer.get_nowait()).copy())
-            self.logger.debug(f'buffer size: {len(self.worker_output_buffer)}')
 
             # Send to other workers if buffer has sufficient size
             if len(self.worker_output_buffer)*self.device_blocksize == self.workers_audio_chunk_size:
                 data = np.concatenate(self.worker_output_buffer, axis=0)
                 self.worker_output_buffer = []
-                self.logger.debug(f'data shape: {data.shape}')
 
                 self.output({
                     'command': self.command,
