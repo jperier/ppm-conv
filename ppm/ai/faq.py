@@ -61,21 +61,23 @@ class FAQWorker(WorkerProcess):
             # Build text & empty buffer
             text = ' '.join(self.text_buffer)
             self.text_buffer = []
-            self.logger.debug(f'Text: {text}')
-            # Compute embeddings and similarity scores
-            x = self.model.encode(text)
-            scores = np.squeeze(x @ self.Q.T)
-            # Get best candidate
-            max_idx = np.argmax(scores)
-            ans_idx = self.answer_index[max_idx]
-            self.logger.info(f'Best candidate: "{self.questions[max_idx]}", score: {scores[max_idx]}')
+            if text.strip():    # Check that text is not just whitespaces
+                self.logger.debug(f'Text: {text}')
+                # Compute embeddings and similarity scores
+                x = self.model.encode(text)
+                scores = np.squeeze(x @ self.Q.T)
+                # Get best candidate
+                max_idx = np.argmax(scores)
+                ans_idx = self.answer_index[max_idx]
+                self.logger.info(f'Best candidate: "{self.questions[max_idx]}", score: {scores[max_idx]}')
 
-            self.output({
-                'command': 'faq',
-                'answer': self.faq[ans_idx]['answer'],
-                'score': scores[max_idx],
-                'timestamp': data['timestamp']
-            })
+                self.output({
+                    'command': 'faq',
+                    'answer': self.faq[ans_idx]['answer'],
+                    'score': scores[max_idx],
+                    'input_text': text,
+                    'timestamp': data['timestamp']
+                })
 
         elif data['command'] == 'conv-reset':
             self.text_buffer = []
