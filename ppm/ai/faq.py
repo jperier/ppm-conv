@@ -18,12 +18,14 @@ class FAQWorker(WorkerProcess):
     def __init__(
             self,
             model_str: str = 'sentence-transformers/use-cmlm-multilingual',
+            score_threshold: float = 0.5,
             faq_path: str = 'configs/faq/faq.yml',
             **kwargs
     ) -> None:
         super().__init__(name='faq')
         self.faq_path = faq_path
         self.model_str = model_str
+        self.threshold = score_threshold
 
         self.text_buffer: List[str] = []
         self.model: SentenceTransformer | None = None
@@ -71,13 +73,16 @@ class FAQWorker(WorkerProcess):
                 ans_idx = self.answer_index[max_idx]
                 self.logger.info(f'Best candidate: "{self.questions[max_idx]}", score: {scores[max_idx]}')
 
-                self.output({
-                    'command': 'faq',
-                    'answer': self.faq[ans_idx]['answer'],
-                    'score': scores[max_idx],
-                    'input_text': text,
-                    'timestamp': data['timestamp']
-                })
+                if scores[max_idx] >= self.threshold:
+                    self.output({
+                        'command': 'faq',
+                        'answer': self.faq[ans_idx]['answer'],
+                        'score': scores[max_idx],
+                        'input_text': text,
+                        'timestamp': data['timestamp']
+                    })
+                else:
+                    self.logger.info(f'Score below threshold {self.threshold} ignoring.')
 
         elif data['command'] == 'conv-reset':
             self.text_buffer = []
