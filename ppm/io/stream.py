@@ -133,47 +133,50 @@ class AudioIOWorker(WorkerProcess):
             pass
 
         # Worker input to device output
-        try:
-            data = self.get_input()
+        if self.input_queue is not None:
+            try:
+                data = self.get_input()
 
-            if data.get('command') == 'conv':
-                # Data validation
-                audio = data.get('audio')
-                if type(audio) is torch.Tensor:
-                    audio = audio.numpy()
-                elif type(audio) is not np.ndarray:
-                    raise ValueError(f'Bad audio received: {data}')
+                if data.get('command') == 'tts':
+                    # Data validation
+                    audio = data.get('audio')
+                    if type(audio) is torch.Tensor:
+                        audio = audio.numpy()
+                    elif type(audio) is not np.ndarray:
+                        raise ValueError(f'Bad audio received: {data}')
+                    self.logger.debug(f'Received audio {audio}')
 
-                # Processing & sending audio to device
-                audio = np.expand_dims(audio, axis=1)
-                out_arrays = []
-                # Audio smaller than blocksize
-                if audio.shape[0] < self.device_blocksize:
-                    outdata = np.zeros((self.device_blocksize, 1))
-                    outdata[:audio.shape[0], :audio.shape[1]] = audio   # TODO remove audio shape 1 ?
-                    out_arrays.append(outdata)
-                # Audio bigger than blocksize
-                elif audio.shape[0] > self.device_blocksize:
-                    # Go over audio
-                    for i in range(0, audio.shape[0] // self.device_blocksize):
-                        j = i * self.device_blocksize
-                        out_arrays.append(audio[j:j+self.device_blocksize])
-                    # Remaining with zero padding TODO is this problematic ?
-                    n_remaining_frames = audio.shape[0] % self.device_blocksize
-                    if n_remaining_frames > 0:
-                        last_chunk = np.zeros((self.device_blocksize, 1))
-                        last_chunk[:n_remaining_frames] = audio[-n_remaining_frames:]
-                        out_arrays.append(last_chunk)
-                # Exact size
-                else:
-                    out_arrays.append(audio)
+                    # Processing & sending audio to device
+                    audio = np.expand_dims(audio, axis=1)
+                    out_arrays = []
+                    # Audio smaller than blocksize
+                    if audio.shape[0] < self.device_blocksize:
+                        outdata = np.zeros((self.device_blocksize, 1))
+                        outdata[:audio.shape[0], :audio.shape[1]] = audio   # TODO remove audio shape 1 ?
+                        out_arrays.append(outdata)
+                    # Audio bigger than blocksize
+                    elif audio.shape[0] > self.device_blocksize:
+                        # Go over audio
+                        for i in range(0, audio.shape[0] // self.device_blocksize):
+                            j = i * self.device_blocksize
+                            out_arrays.append(audio[j:j+self.device_blocksize])
+                        # Remaining with zero padding TODO is this problematic ?
+                        n_remaining_frames = audio.shape[0] % self.device_blocksize
+                        if n_remaining_frames > 0:
+                            last_chunk = np.zeros((self.device_blocksize, 1))
+                            last_chunk[:n_remaining_frames] = audio[-n_remaining_frames:]
+                            out_arrays.append(last_chunk)
+                    # Exact size
+                    else:
+                        out_arrays.append(audio)
 
-                # Push to queue
-                for out_array in out_arrays:
-                    self.device_output_buffer.put(out_array)
+                    # Push to queue
+                    for out_array in out_arrays:
+                        self.logger.debug(f'Output: {out_array}')
+                        self.device_output_buffer.put(out_array)
 
-        except queue.Empty:
-            pass
+            except queue.Empty:
+                pass
 
     def cleanup(self) -> None:
         self.stream.abort()

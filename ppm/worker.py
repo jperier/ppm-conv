@@ -53,7 +53,7 @@ class WorkerProcess(mp.Process):
         try:
             return WorkerProcess.registry[worker_type](**config)
         except KeyError:
-            raise KeyError(f'Could not find "{worker_type}" in registry.'
+            raise KeyError(f'Could not find "{worker_type}" in registry. '
                            'Check spelling and import of corresponding module in main script.')
 
     def __init__(self, name: str | None = None, **kwargs) -> None:
