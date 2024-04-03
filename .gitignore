@@ -12,3 +12,5 @@ configs/sys_prompts/
 
 .venv/
 .idea/
+
+*.wav
