@@ -27,7 +27,7 @@ class FAQWorker(WorkerProcess):
         self.model_str = model_str
         self.threshold = score_threshold
 
-        self.text_buffer: List[str] = []
+        self.text_buffer: List[str] | str = []
         self.model: SentenceTransformer | None = None
         self.faq: List[dict] = []
         self.questions: List[str] = []
@@ -57,11 +57,14 @@ class FAQWorker(WorkerProcess):
         data = self.get_input()
 
         if data['command'] == 'conv':
-            self.text_buffer.append(data['text'])
+            if data.get('asr_context_type') == 'buffer':
+                self.text_buffer = data['text']
+            else:
+                self.text_buffer.append(data['text'])
 
         elif data['command'] == 'conv-silence':
             # Build text & empty buffer
-            text = ' '.join(self.text_buffer)
+            text = ' '.join(self.text_buffer) if isinstance(self.text_buffer, list) else self.text_buffer
             self.text_buffer = []
             if text.strip():    # Check that text is not just whitespaces
                 self.logger.debug(f'Text: {text}')

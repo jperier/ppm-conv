@@ -126,6 +126,7 @@ class ASRWorker(WorkerProcess):
         # Context
         if context_options is None:
             context_options = {}
+        self.context_type = context_type
         self.context: ASRContext = {
             "prefix": PrefixASRContext,
             "buffer": BufferedASRContext,
@@ -219,6 +220,7 @@ class ASRWorker(WorkerProcess):
 
             del data['audio']
             data['text'] = text
+            data['asr_context_type'] = self.context_type
             if segments:
                 data['segments'] = segments
 
