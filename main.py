@@ -10,6 +10,8 @@ parser.add_argument('config_file')
 parser.add_argument('-t', '--timeout', type=int, default=120,
                     help='Timeout for workers to be ready, in seconds, default: 120')
 parser.add_argument("-d", "--debug", action='store_true', help="print debug logs in addition log file")
+parser.add_argument('--no_io', action='store_true', help="will not import io workers, useful to avoid"
+                    "errors if running on a server without audio librairies")
 
 
 if __name__ == "__main__":
@@ -27,7 +29,8 @@ if __name__ == "__main__":
     from ppm.logs import logger_process, mp_logger
 
     # Import Workers' files to run registration
-    from ppm.io import stream, transcript_to_file, recording
+    if not args.no_io:
+        from ppm.io import stream, transcript_to_file, recording
     from ppm.ai import vad, asr, faq, tts
     from ppm.network import sockets
 
