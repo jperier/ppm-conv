@@ -22,7 +22,6 @@ if __name__ == "__main__":
     import os
     import time
     import yaml
-    import logging
     import multiprocessing as mp
 
     from ppm.worker import WorkerProcess
