@@ -9,6 +9,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument('config_file')
 parser.add_argument('-t', '--timeout', type=int, default=120,
                     help='Timeout for workers to be ready, in seconds, default: 120')
+parser.add_argument("-d", "--debug", action='store_true', help="print debug logs in addition log file")
 
 
 if __name__ == "__main__":
@@ -19,6 +20,7 @@ if __name__ == "__main__":
     import os
     import time
     import yaml
+    import logging
     import multiprocessing as mp
 
     from ppm.worker import WorkerProcess
@@ -31,10 +33,10 @@ if __name__ == "__main__":
 
     # Logger
     log_q = mp.Manager().Queue()
-    log_process = mp.Process(target=logger_process, name='log_process', args=(log_q,))
+    log_process = mp.Process(target=logger_process, name='log_process', args=(log_q, args.debug))
     log_process.start()
     print('Main and log processes started', mp.current_process().pid, log_process.pid)
-    logger = mp_logger(log_q)
+    logger = mp_logger(log_q, name='ppm')
     logger.info("-" * 10 + "New Session" + "-" * 10)
 
     processes = None
