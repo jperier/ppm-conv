@@ -144,17 +144,16 @@ class AudioIOWorker(WorkerProcess):
                         audio = audio.numpy()
                     elif type(audio) is not np.ndarray:
                         raise ValueError(f'Bad audio received: {data}')
-                    self.logger.debug(f'Received audio {audio}')
 
                     # Processing & sending audio to device
                     audio = np.expand_dims(audio, axis=1)
                     out_arrays = []
-                    # Audio smaller than blocksize
+                    # Audio smaller than blocksize, padding with zeros
                     if audio.shape[0] < self.device_blocksize:
                         outdata = np.zeros((self.device_blocksize, 1))
                         outdata[:audio.shape[0], :audio.shape[1]] = audio   # TODO remove audio shape 1 ?
                         out_arrays.append(outdata)
-                    # Audio bigger than blocksize
+                    # Audio bigger than blocksize, sending by chunks to output
                     elif audio.shape[0] > self.device_blocksize:
                         # Go over audio
                         for i in range(0, audio.shape[0] // self.device_blocksize):
@@ -172,14 +171,14 @@ class AudioIOWorker(WorkerProcess):
 
                     # Push to queue
                     for out_array in out_arrays:
-                        self.logger.debug(f'Output: {out_array}')
                         self.device_output_buffer.put(out_array)
 
             except queue.Empty:
                 pass
 
     def cleanup(self) -> None:
-        self.stream.abort()
+        if self.stream is not None:
+            self.stream.abort()
 
 
 @WorkerProcess.register('file_stream')

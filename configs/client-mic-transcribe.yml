@@ -2,15 +2,16 @@ global:
   command_mode: 'transcribe'
   sample_rate: 16000
 
-device_stream:
+audio_io:
   segment_length: 16000
+  device: 'hw:1,0'
   to: [recording, vad]
 
 recording:
   buffer_size: 60
 
-
 vad:
+  threshold: 0.3
   to: socket_client
 
 socket_client:
