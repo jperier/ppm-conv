@@ -30,7 +30,7 @@ if __name__ == "__main__":
     # Import Workers' files to run registration
     if not args.no_io:
         from ppm.io import stream, transcript_to_file, recording
-    from ppm.ai import vad, asr, faq, tts
+    from ppm.ai import vad, asr, faq, tts, llm
     from ppm.network import sockets
 
     # Logger

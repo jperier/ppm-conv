@@ -41,8 +41,11 @@ class TTSWorker(WorkerProcess):
     def routine(self) -> None:
         data = self.get_input()
 
-        if data['command'] == 'faq':
-            text = data['answer'] if data['score'] > 0.30 else 'euuuh'     # TODO move to conversation logic later
+        if data['command'] in ('faq', 'llm'):
+            if data['command'] == 'faq':
+                text = data['answer'] if data['score'] > 0.30 else 'euuuh'     # TODO move to conversation logic later
+            else:
+                text = data['text']
             self.logger.debug(f'Generating audio for "{text}"')
 
             # Model audio generation
