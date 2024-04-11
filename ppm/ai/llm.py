@@ -1,5 +1,6 @@
 import requests
 import json
+import re
 from typing import List, Dict, Any
 
 from ..worker import WorkerProcess
@@ -12,10 +13,33 @@ from ..worker import WorkerProcess
 URL = 'http://localhost:11434/'
 ROUTE = 'api/chat'
 MODEL_ID = 'llama2:13b'
-SYS_PROMPT_PATH = 'sys_prompts/prompt_context.txt'
+SYS_PROMPT_PATH = 'sys_prompts/prompt_context_faq.txt'
 DEFAULT_OPTIONS = {
     'temperature': 0.1,
 }
+
+
+def remove_emojis(string):
+    emoj = re.compile('['
+                      u'\U0001F600-\U0001F64F'  # emoticons
+                      u'\U0001F300-\U0001F5FF'  # symbols & pictographs
+                      u'\U0001F680-\U0001F6FF'  # transport & map symbols
+                      u'\U0001F1E0-\U0001F1FF'  # flags (iOS)
+                      u'\U00002500-\U00002BEF'  # chinese char
+                      u'\U00002702-\U000027B0'
+                      u'\U000024C2-\U0001F251'
+                      u'\U0001f926-\U0001f937'
+                      u'\U00010000-\U0010ffff'
+                      u'\u2640-\u2642'
+                      u'\u2600-\u2B55'
+                      u'\u200d'
+                      u'\u23cf'
+                      u'\u23e9'
+                      u'\u231a'
+                      u'\ufe0f'  # dingbats
+                      u'\u3030'
+                      ']+', re.UNICODE)
+    return re.sub(emoj, '', string)
 
 
 @WorkerProcess.register('llm')
@@ -56,7 +80,7 @@ class LlmWorker(WorkerProcess):
             'model': self.model_id,
             'options': self.options,
             'messages': [{'role': 'system', 'content': self.sys_prompt}]
-            }
+        }
 
     def routine(self) -> None:
         data = self.get_input()
@@ -73,7 +97,8 @@ class LlmWorker(WorkerProcess):
             self.req_options['messages'].append({'role': 'user', 'content': user_message})
 
             # Bot response
-            text_list = []
+            current_sentence = []
+            bot_message = []
             with requests.Session().post(url=URL + ROUTE, json=self.req_options, stream=True) as res:
                 for line in res.iter_lines():
                     if line:
@@ -81,16 +106,20 @@ class LlmWorker(WorkerProcess):
                         if line_data['done']:
                             break
                         else:
-                            text_list.append(line_data['message']['content'])
-            bot_message = ''.join(text_list)
+                            text = line_data['message']['content']
+                            current_sentence.append(text)
+                            # If a sentence is over, sending it
+                            if any(char in text for char in ('.', '!', '?')):
+                                sentence = ''.join(current_sentence)
+                                self.send_chunk(sentence, data['timestamp'])
+                                bot_message.append(sentence)
+                                current_sentence = []
+                if len(current_sentence) > 0:
+                    sentence = ''.join(current_sentence)
+                    self.send_chunk(sentence, data['timestamp'])
+                    bot_message.append(sentence)
 
-            # Output
-            self.output({
-                'command': 'llm',
-                'user_message': user_message,
-                'text': bot_message,
-                'timestamp': data['timestamp']
-            })
+            bot_message = ''.join(bot_message)
 
             # update history & log
             self.req_options['messages'].append({'role': 'assistant', 'content': bot_message})
@@ -99,3 +128,17 @@ class LlmWorker(WorkerProcess):
 
         elif data['command'] == 'conv-reset':
             self.req_options['messages'] = [{'role': 'system', 'content': self.sys_prompt}]
+
+    def send_chunk(self, text: str, timestamp: str) -> None:
+        # Remove special tokens & emojis
+        to_remove = ('*smile*', '*giggle*', '*wink*', '[Inst]', '[Inst', '\n')
+        for token in to_remove:
+            text = text.replace(token, '')
+        text = remove_emojis(text)
+
+        # Output
+        self.output({
+            'command': 'llm',
+            'text': text,
+            'timestamp': timestamp
+        })
