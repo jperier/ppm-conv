@@ -50,6 +50,7 @@ class LlmWorker(WorkerProcess):
             route: str = 'api/chat',
             model_id: str = 'llama2:13b',
             sys_prompt_path: str | None = None,
+            intermediate_sys_prompt: str | None = None,
             options: dict = DEFAULT_OPTIONS,
             **kwargs
     ) -> None:
@@ -58,6 +59,7 @@ class LlmWorker(WorkerProcess):
         self.url = ollama_url + route
         self.model_id = model_id
         self.sys_prompt_path = sys_prompt_path
+        self.intermediate_sys_prompt = intermediate_sys_prompt
         self.options = options
 
         self.sys_prompt: str = ''
@@ -92,46 +94,53 @@ class LlmWorker(WorkerProcess):
                 self.text_buffer.append(data['text'])
 
         elif data['command'] == 'conv-silence':
-            # User input
             user_message = ' '.join(self.text_buffer) if isinstance(self.text_buffer, list) else self.text_buffer
-            self.req_options['messages'].append({'role': 'user', 'content': user_message})
+            if user_message.strip():
+                # User input
+                self.req_options['messages'].append({'role': 'user', 'content': user_message})
 
-            # Bot response
-            current_sentence = []
-            bot_message = []
-            with requests.Session().post(url=URL + ROUTE, json=self.req_options, stream=True) as res:
-                for line in res.iter_lines():
-                    if line:
-                        line_data = json.loads(line)
-                        if line_data['done']:
-                            break
-                        else:
-                            text = line_data['message']['content']
-                            current_sentence.append(text)
-                            # If a sentence is over, sending it
-                            if any(char in text for char in ('.', '!', '?')):
-                                sentence = ''.join(current_sentence)
-                                self.send_chunk(sentence, data['timestamp'])
-                                bot_message.append(sentence)
-                                current_sentence = []
-                if len(current_sentence) > 0:
-                    sentence = ''.join(current_sentence)
-                    self.send_chunk(sentence, data['timestamp'])
-                    bot_message.append(sentence)
+                # Add intermediate system prompt (asks to be concise usually)
+                if self.intermediate_sys_prompt is not None:
+                    self.req_options['messages'].append({'role': 'system', 'content': self.intermediate_sys_prompt})
 
-            bot_message = ''.join(bot_message)
+                # Bot response
+                current_sentence = []
+                bot_message = []
+                with requests.Session().post(url=URL + ROUTE, json=self.req_options, stream=True) as res:
+                    for line in res.iter_lines():
+                        if line:
+                            line_data = json.loads(line)
+                            if line_data['done']:
+                                break
+                            else:
+                                text = line_data['message']['content']
+                                current_sentence.append(text)
+                                # If a sentence is over, sending it
+                                if any(char in text for char in ('.', '!', '?')):
+                                    sentence = ''.join(current_sentence)
+                                    self.send_chunk(sentence, data['timestamp'])
+                                    bot_message.append(sentence)
+                                    current_sentence = []
+                    if len(current_sentence) > 0:
+                        sentence = ''.join(current_sentence)
+                        if sentence.strip():
+                            self.send_chunk(sentence, data['timestamp'])
+                            bot_message.append(sentence)
 
-            # update history & log
-            self.req_options['messages'].append({'role': 'assistant', 'content': bot_message})
-            self.logger.debug(f'User message: "{user_message}"')
-            self.logger.debug(f'LLM response: "{bot_message}"')
+                bot_message = ''.join(bot_message)
+
+                # update history & log
+                self.req_options['messages'].append({'role': 'assistant', 'content': bot_message})
+                self.logger.debug(f'User message: "{user_message}"')
+                self.logger.debug(f'LLM response: "{bot_message}"')
 
         elif data['command'] == 'conv-reset':
             self.req_options['messages'] = [{'role': 'system', 'content': self.sys_prompt}]
 
     def send_chunk(self, text: str, timestamp: str) -> None:
         # Remove special tokens & emojis
-        to_remove = ('*smile*', '*giggle*', '*wink*', '[Inst]', '[Inst', '\n')
+        to_remove = ('*smile*', '*giggle*', '*wink*',
+                     '[Inst', '[Inst]', '[/Inst]', '\n')
         for token in to_remove:
             text = text.replace(token, '')
         text = remove_emojis(text)
